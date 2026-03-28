@@ -150,6 +150,27 @@ main {
 }
 @keyframes newBadgePulse { from{opacity:1;} to{opacity:0.5;} }
 
+/* ── CARTE NON ATTRAPÉE ── */
+.poke-card.uncaught {
+  border-color: rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.02);
+  opacity: 0.45;
+  cursor: default;
+}
+.poke-card.uncaught:hover {
+  transform: none;
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: none;
+}
+.poke-card.uncaught img {
+  filter: brightness(0) invert(0.15) saturate(0);
+  opacity: 0.5;
+}
+.poke-card.uncaught .poke-name {
+  color: rgba(255,255,255,0.2);
+}
+.poke-card.uncaught::after { display: none; }
+
 /* ── VIDE ── */
 #empty-state {
   text-align: center; padding: 80px 20px;
@@ -216,11 +237,8 @@ footer a { color: var(--yellow); text-decoration: none; }
 </header>
 
 <div class="filters">
-  <button class="filter-btn active" data-filter="all"     onclick="setFilter('all',this)">Tous</button>
-  <button class="filter-btn"        data-filter="recent"  onclick="setFilter('recent',this)">Récents</button>
-  <button class="filter-btn"        data-filter="fire"    onclick="setFilter('fire',this)">🔥 Feu</button>
-  <button class="filter-btn"        data-filter="water"   onclick="setFilter('water',this)">💧 Eau</button>
-  <button class="filter-btn"        data-filter="grass"   onclick="setFilter('grass',this)">🌿 Plante</button>
+  <button class="filter-btn active" data-filter="all"    onclick="setFilter('all',this)">Tous</button>
+  <button class="filter-btn"        data-filter="recent" onclick="setFilter('recent',this)">Récents</button>
   <input class="search-input" id="search" type="text" placeholder="Chercher un Pokémon…" oninput="applySearch()" autocomplete="off"/>
 </div>
 
@@ -241,123 +259,320 @@ footer a { color: var(--yellow); text-decoration: none; }
 </footer>
 
 <script>
-const FIREBASE_URL = "https://flpdex-2222b-default-rtdb.europe-west1.firebasedatabase.app";
-// NOUVELLES SOURCES (Identiques au widget)
-const SPRITE_ANI      = "https://play.pokemonshowdown.com/sprites/ani/";
-const SPRITE_FALLBACK = "https://img.pokemondb.net/sprites/home/normal/";
+const FIREBASE_URL   = "https://flpdex-2222b-default-rtdb.europe-west1.firebasedatabase.app";
+const SPRITE_ANI     = "https://play.pokemonshowdown.com/sprites/ani/";
+const SPRITE_STATIC  = "https://img.pokemondb.net/sprites/home/normal/";
 
-const CHAIN_TYPES = {
-  charmander:"fire", torchic:"fire", cyndaquil:"fire", chimchar:"fire", tepig:"fire", fennekin:"fire",
-  squirtle:"water",  mudkip:"water",  totodile:"water", piplup:"water",  oshawott:"water", froakie:"water",
-  bulbasaur:"grass", treecko:"grass", chikorita:"grass",turtwig:"grass", snivy:"grass",    chespin:"grass",
-};
-const TOTAL_CHAINS = 1000; // Mis à jour pour correspondre à ton nouveau Master Pokedex
+// Liste complète — même ordre que Pokedex_Master dans widget.html
+const Pokedex_Master = [
+  {n:"Bulbizarre",s:"bulbasaur"},{n:"Herbizarre",s:"ivysaur"},{n:"Florizarre",s:"venusaur"},
+  {n:"Salamèche",s:"charmander"},{n:"Reptincel",s:"charmeleon"},{n:"Dracaufeu",s:"charizard"},
+  {n:"Carapuce",s:"squirtle"},{n:"Carabaffe",s:"wartortle"},{n:"Tortank",s:"blastoise"},
+  {n:"Chenipan",s:"caterpie"},{n:"Chrysacier",s:"metapod"},{n:"Papilusion",s:"butterfree"},
+  {n:"Aspicot",s:"weedle"},{n:"Coconfort",s:"kakuna"},{n:"Dardargnan",s:"beedrill"},
+  {n:"Roucool",s:"pidgey"},{n:"Roucoups",s:"pidgeotto"},{n:"Roucarnage",s:"pidgeot"},
+  {n:"Rattata",s:"rattata"},{n:"Rattatac",s:"raticate"},{n:"Piafabec",s:"spearow"},
+  {n:"Rapasdepic",s:"fearow"},{n:"Abo",s:"ekans"},{n:"Arbok",s:"arbok"},
+  {n:"Pikachu",s:"pikachu"},{n:"Raichu",s:"raichu"},{n:"Sablette",s:"sandshrew"},
+  {n:"Sablaireau",s:"sandslash"},{n:"Nidoran♀",s:"nidoran-f"},{n:"Nidorina",s:"nidorina"},
+  {n:"Nidoqueen",s:"nidoqueen"},{n:"Nidoran♂",s:"nidoran-m"},{n:"Nidorino",s:"nidorino"},
+  {n:"Nidoking",s:"nidoking"},{n:"Mélofée",s:"clefairy"},{n:"Mélodelfe",s:"clefable"},
+  {n:"Goupix",s:"vulpix"},{n:"Feunard",s:"ninetales"},{n:"Rondoudou",s:"jigglypuff"},
+  {n:"Grodoudou",s:"wigglytuff"},{n:"Nosferapti",s:"zubat"},{n:"Nosferalto",s:"golbat"},
+  {n:"Mystherbe",s:"oddish"},{n:"Ortide",s:"gloom"},{n:"Rafflesia",s:"vileplume"},
+  {n:"Paras",s:"paras"},{n:"Parasect",s:"parasect"},{n:"Mimitoss",s:"venonat"},
+  {n:"Aéromite",s:"venomoth"},{n:"Taupiqueur",s:"diglett"},{n:"Triopikeur",s:"dugtrio"},
+  {n:"Miaouss",s:"meowth"},{n:"Persian",s:"persian"},{n:"Psykokwak",s:"psyduck"},
+  {n:"Akwakwak",s:"golduck"},{n:"Férosinge",s:"mankey"},{n:"Colossinge",s:"primeape"},
+  {n:"Caninos",s:"growlithe"},{n:"Arcanin",s:"arcanine"},{n:"Ptitard",s:"poliwag"},
+  {n:"Tétarte",s:"poliwhirl"},{n:"Tartard",s:"poliwrath"},{n:"Abra",s:"abra"},
+  {n:"Kadabra",s:"kadabra"},{n:"Alakazam",s:"alakazam"},{n:"Machoc",s:"machop"},
+  {n:"Machopeur",s:"machoke"},{n:"Mackogneur",s:"machamp"},{n:"Chétiflor",s:"bellsprout"},
+  {n:"Boustiflor",s:"weepinbell"},{n:"Empiflor",s:"victreebel"},{n:"Tentacool",s:"tentacool"},
+  {n:"Tentacruel",s:"tentacruel"},{n:"Racaillou",s:"geodude"},{n:"Gravalanch",s:"graveler"},
+  {n:"Grolem",s:"golem"},{n:"Ponyta",s:"ponyta"},{n:"Galopa",s:"rapidash"},
+  {n:"Ramoloss",s:"slowpoke"},{n:"Flagadoss",s:"slowbro"},{n:"Magnéti",s:"magnemite"},
+  {n:"Magnéton",s:"magneton"},{n:"Canarticho",s:"farfetchd"},{n:"Doduo",s:"doduo"},
+  {n:"Dodrio",s:"dodrio"},{n:"Otaria",s:"seel"},{n:"Lamantine",s:"dewgong"},
+  {n:"Tadmorv",s:"grimer"},{n:"Grotadmorv",s:"muk"},{n:"Kokiyas",s:"shellder"},
+  {n:"Crustabri",s:"cloyster"},{n:"Fantominus",s:"gastly"},{n:"Spectrum",s:"haunter"},
+  {n:"Ectoplasma",s:"gengar"},{n:"Onix",s:"onix"},{n:"Soporifik",s:"drowzee"},
+  {n:"Hypnomade",s:"hypno"},{n:"Krabby",s:"krabby"},{n:"Krabboss",s:"kingler"},
+  {n:"Voltorbe",s:"voltorb"},{n:"Électrode",s:"electrode"},{n:"Nœunœuf",s:"exeggcute"},
+  {n:"Noadkoko",s:"exeggutor"},{n:"Oselet",s:"cubone"},{n:"Ossatueur",s:"marowak"},
+  {n:"Kicklee",s:"hitmonlee"},{n:"Tygnon",s:"hitmonchan"},{n:"Excelangue",s:"lickitung"},
+  {n:"Smogo",s:"koffing"},{n:"Smogogo",s:"weezing"},{n:"Rhinocorne",s:"rhyhorn"},
+  {n:"Rhinoféros",s:"rhydon"},{n:"Leveinard",s:"chansey"},{n:"Saquedeneu",s:"tangela"},
+  {n:"Kangourex",s:"kangaskhan"},{n:"Hypotrempe",s:"horsea"},{n:"Hypocéan",s:"seadra"},
+  {n:"Poissirène",s:"goldeen"},{n:"Poissoroy",s:"seaking"},{n:"Stari",s:"staryu"},
+  {n:"Staross",s:"starmie"},{n:"M. Mime",s:"mr-mime"},{n:"Insécateur",s:"scyther"},
+  {n:"Lippoutou",s:"jynx"},{n:"Élektek",s:"electabuzz"},{n:"Magmar",s:"magmar"},
+  {n:"Scarabrute",s:"pinsir"},{n:"Tauros",s:"tauros"},{n:"Magicarpe",s:"magikarp"},
+  {n:"Léviator",s:"gyarados"},{n:"Lokhlass",s:"lapras"},{n:"Métamorph",s:"ditto"},
+  {n:"Évoli",s:"eevee"},{n:"Aquali",s:"vaporeon"},{n:"Voltali",s:"jolteon"},
+  {n:"Pyroli",s:"flareon"},{n:"Porygon",s:"porygon"},{n:"Amonita",s:"omanyte"},
+  {n:"Amonistar",s:"omastar"},{n:"Kabuto",s:"kabuto"},{n:"Kabutops",s:"kabutops"},
+  {n:"Ptéra",s:"aerodactyl"},{n:"Ronflex",s:"snorlax"},{n:"Artikodin",s:"articuno"},
+  {n:"Électhor",s:"zapdos"},{n:"Sulfura",s:"moltres"},{n:"Minidraco",s:"dratini"},
+  {n:"Draco",s:"dragonair"},{n:"Dracolosse",s:"dragonite"},{n:"Mewtwo",s:"mewtwo"},{n:"Mew",s:"mew"},
+  {n:"Germignon",s:"chikorita"},{n:"Macronium",s:"bayleef"},{n:"Méganium",s:"meganium"},
+  {n:"Héricendre",s:"cyndaquil"},{n:"Feurisson",s:"quilava"},{n:"Typhlosion",s:"typhlosion"},
+  {n:"Kaiminus",s:"totodile"},{n:"Crocrodil",s:"croconaw"},{n:"Aligatueur",s:"feraligatr"},
+  {n:"Fouinette",s:"sentret"},{n:"Fouinar",s:"furret"},{n:"Hoothoot",s:"hoothoot"},
+  {n:"Noarfang",s:"noctowl"},{n:"Coxy",s:"ledyba"},{n:"Coxyclaque",s:"ledian"},
+  {n:"Mimigal",s:"spinarak"},{n:"Migalos",s:"ariados"},{n:"Nostenfer",s:"crobat"},
+  {n:"Loupio",s:"chinchou"},{n:"Lanturn",s:"lanturn"},{n:"Pichu",s:"pichu"},
+  {n:"Mélo",s:"cleffa"},{n:"Toudoudou",s:"igglybuff"},{n:"Togepi",s:"togepi"},
+  {n:"Togetic",s:"togetic"},{n:"Natu",s:"natu"},{n:"Xatu",s:"xatu"},
+  {n:"Laporeille",s:"mareep"},{n:"Lainergie",s:"flaaffy"},{n:"Pharamp",s:"ampharos"},
+  {n:"Joliflor",s:"bellossom"},{n:"Marill",s:"marill"},{n:"Azumarill",s:"azumarill"},
+  {n:"Simularbre",s:"sudowoodo"},{n:"Tarpaud",s:"politoed"},{n:"Graniville",s:"hoppip"},
+  {n:"Floravol",s:"skiploom"},{n:"Cotovol",s:"jumpluff"},{n:"Capumain",s:"aipom"},
+  {n:"Tournegrin",s:"sunkern"},{n:"Héliatronc",s:"sunflora"},{n:"Yanma",s:"yanma"},
+  {n:"Axoloto",s:"wooper"},{n:"Maraiste",s:"quagsire"},{n:"Mentali",s:"espeon"},
+  {n:"Noctali",s:"umbreon"},{n:"Cornèbre",s:"murkrow"},{n:"Roigada",s:"slowking"},
+  {n:"Feuforêve",s:"misdreavus"},{n:"Zarbi",s:"unown"},{n:"Qulbutoké",s:"wobbuffet"},
+  {n:"Girafarig",s:"girafarig"},{n:"Pomdepik",s:"pineco"},{n:"Foretress",s:"forretress"},
+  {n:"Insolourdo",s:"dunsparce"},{n:"Scorplane",s:"gligar"},{n:"Steelix",s:"steelix"},
+  {n:"Snubbull",s:"snubbull"},{n:"Granbull",s:"granbull"},{n:"Qwilfish",s:"qwilfish"},
+  {n:"Cizayox",s:"scizor"},{n:"Caratroc",s:"shuckle"},{n:"Scarhino",s:"heracross"},
+  {n:"Farfuret",s:"sneasel"},{n:"Teddiursa",s:"teddiursa"},{n:"Ursaring",s:"ursaring"},
+  {n:"Limagma",s:"slugma"},{n:"Volcaropod",s:"magcargo"},{n:"Marcacrin",s:"swinub"},
+  {n:"Cochignon",s:"piloswine"},{n:"Corayon",s:"corsola"},{n:"Rémoraid",s:"remoraid"},
+  {n:"Octillery",s:"octillery"},{n:"Cadoizo",s:"delibird"},{n:"Mantine",s:"mantine"},
+  {n:"Airmure",s:"skarmory"},{n:"Malosse",s:"houndour"},{n:"Démolosse",s:"houndoom"},
+  {n:"Hyporoi",s:"kingdra"},{n:"Phanpy",s:"phanpy"},{n:"Donphan",s:"donphan"},
+  {n:"Porygon2",s:"porygon2"},{n:"Cerfrousse",s:"stantler"},{n:"Queulorior",s:"smeargle"},
+  {n:"Debugant",s:"tyrogue"},{n:"Kapoera",s:"hitmontop"},{n:"Lippouti",s:"smoochum"},
+  {n:"Élekid",s:"elekid"},{n:"Magby",s:"magby"},{n:"Écrémeuh",s:"miltank"},
+  {n:"Leuphorie",s:"blissey"},{n:"Raikou",s:"raikou"},{n:"Entei",s:"entei"},
+  {n:"Suicune",s:"suicune"},{n:"Embrylex",s:"larvitar"},{n:"Ymphect",s:"pupitar"},
+  {n:"Tyranocif",s:"tyranitar"},{n:"Lugia",s:"lugia"},{n:"Ho-Oh",s:"ho-oh"},{n:"Celebi",s:"celebi"},
+  {n:"Arcko",s:"treecko"},{n:"Massko",s:"grovyle"},{n:"Jungko",s:"sceptile"},
+  {n:"Poussifeu",s:"torchic"},{n:"Galifeu",s:"combusken"},{n:"Braségali",s:"blaziken"},
+  {n:"Gobou",s:"mudkip"},{n:"Flobio",s:"marshtomp"},{n:"Laggron",s:"swampert"},
+  {n:"Grahyèna",s:"mightyena"},{n:"Linéon",s:"linoone"},{n:"Papinox",s:"dustox"},
+  {n:"Ludicolo",s:"ludicolo"},{n:"Tengalice",s:"shiftry"},{n:"Bekipan",s:"pelipper"},
+  {n:"Tarsal",s:"ralts"},{n:"Kirlia",s:"kirlia"},{n:"Gardevoir",s:"gardevoir"},
+  {n:"Chapignon",s:"breloom"},{n:"Monaflèmit",s:"slaking"},{n:"Ninjask",s:"ninjask"},
+  {n:"Brouhabam",s:"exploud"},{n:"Hariyama",s:"hariyama"},{n:"Galeking",s:"aggron"},
+  {n:"Charmina",s:"medicham"},{n:"Élecsprint",s:"manectric"},{n:"Rosélia",s:"roselia"},
+  {n:"Sharpedo",s:"sharpedo"},{n:"Wailord",s:"wailord"},{n:"Camérupt",s:"camerupt"},
+  {n:"Libégon",s:"flygon"},{n:"Cacturne",s:"cacturne"},{n:"Altaria",s:"altaria"},
+  {n:"Barbicha",s:"whiscash"},{n:"Colhomard",s:"crawdaunt"},{n:"Kaorine",s:"claydol"},
+  {n:"Vacilys",s:"cradily"},{n:"Armaldo",s:"armaldo"},{n:"Milobellus",s:"milotic"},
+  {n:"Branette",s:"banette"},{n:"Téraclope",s:"dusclops"},{n:"Absol",s:"absol"},
+  {n:"Kaimorse",s:"walrein"},{n:"Drattak",s:"salamence"},{n:"Métalosse",s:"metagross"},
+  {n:"Regirock",s:"regirock"},{n:"Regice",s:"regice"},{n:"Registeel",s:"registeel"},
+  {n:"Latias",s:"latias"},{n:"Latios",s:"latios"},{n:"Kyogre",s:"kyogre"},
+  {n:"Groudon",s:"groudon"},{n:"Rayquaza",s:"rayquaza"},{n:"Jirachi",s:"jirachi"},{n:"Deoxys",s:"deoxys"},
+  {n:"Tortipouss",s:"turtwig"},{n:"Boskara",s:"grotle"},{n:"Torterra",s:"torterra"},
+  {n:"Ouisticram",s:"chimchar"},{n:"Chimpenfeu",s:"monferno"},{n:"Simiabraz",s:"infernape"},
+  {n:"Tiplouf",s:"piplup"},{n:"Prinplouf",s:"prinplup"},{n:"Pingoléon",s:"empoleon"},
+  {n:"Étouraptor",s:"staraptor"},{n:"Luxray",s:"luxray"},{n:"Roserade",s:"roserade"},
+  {n:"Charkos",s:"rampardos"},{n:"Bastiodon",s:"bastiodon"},{n:"Vespiquen",s:"vespiquen"},
+  {n:"Pachirisu",s:"pachirisu"},{n:"Mustéflott",s:"floatzel"},{n:"Tritosor",s:"gastrodon"},
+  {n:"Grodrive",s:"drifblim"},{n:"Lockpin",s:"lopunny"},{n:"Magirêve",s:"mismagius"},
+  {n:"Corboss",s:"honchkrow"},{n:"Chaffreux",s:"purugly"},{n:"Spiritomb",s:"spiritomb"},
+  {n:"Carchacrok",s:"garchomp"},{n:"Lucario",s:"lucario"},{n:"Hippodocus",s:"hippowdon"},
+  {n:"Drascore",s:"drapion"},{n:"Coatox",s:"toxicroak"},{n:"Dimoret",s:"weavile"},
+  {n:"Magnézone",s:"magnezone"},{n:"Rhinastoc",s:"rhyperior"},{n:"Élekable",s:"electivire"},
+  {n:"Marmagro",s:"magmortar"},{n:"Togekiss",s:"togekiss"},{n:"Phyllali",s:"leafeon"},
+  {n:"Givrali",s:"glaceon"},{n:"Mammochon",s:"mamoswine"},{n:"Porygon-Z",s:"porygon-z"},
+  {n:"Gallame",s:"gallade"},{n:"Noctunoir",s:"dusknoir"},{n:"Dialga",s:"dialga"},
+  {n:"Palkia",s:"palkia"},{n:"Giratina",s:"giratina"},{n:"Arceus",s:"arceus"},
+  {n:"Majaspic",s:"serperior"},{n:"Roitiflam",s:"emboar"},{n:"Clamiral",s:"samurott"},
+  {n:"Léopardus",s:"liepard"},{n:"Mushana",s:"musharna"},{n:"Zéblitz",s:"zebstrika"},
+  {n:"Gigalithe",s:"gigalith"},{n:"Minotaupe",s:"excadrill"},{n:"Bétochef",s:"conkeldurr"},
+  {n:"Crapustule",s:"seismitoad"},{n:"Manternel",s:"leavanny"},{n:"Brutapode",s:"scolipede"},
+  {n:"Farfaduvet",s:"whimsicott"},{n:"Fragilady",s:"lilligant"},{n:"Crocorible",s:"krookodile"},
+  {n:"Darumacho",s:"darmanitan"},{n:"Crabaraque",s:"crustle"},{n:"Baggaïd",s:"scrafty"},
+  {n:"Tutankafer",s:"cofagrigus"},{n:"Mégapagos",s:"carracosta"},{n:"Aéroptéryx",s:"archeops"},
+  {n:"Miasmax",s:"garbodor"},{n:"Zoroark",s:"zoroark"},{n:"Pashmilla",s:"cinccino"},
+  {n:"Sidérella",s:"gothitelle"},{n:"Symbios",s:"reuniclus"},{n:"Lakmécygne",s:"swanna"},
+  {n:"Sorbouboul",s:"vanilluxe"},{n:"Haydaim",s:"sawsbuck"},{n:"Lançargot",s:"escavalier"},
+  {n:"Gaulet",s:"amoonguss"},{n:"Moyade",s:"jellicent"},{n:"Noacier",s:"ferrothorn"},
+  {n:"Klinklang",s:"klinklang"},{n:"Ohmassacre",s:"eelektross"},{n:"Neitram",s:"beheeyem"},
+  {n:"Lugulabre",s:"chandelure"},{n:"Tranchodon",s:"haxorus"},{n:"Polagriffe",s:"beartic"},
+  {n:"Shaofouine",s:"mienshao"},{n:"Golurk",s:"golurk"},{n:"Scalproie",s:"bisharp"},
+  {n:"Gueriaigle",s:"braviary"},{n:"Vaututrice",s:"mandibuzz"},{n:"Trioxhydre",s:"hydreigon"},
+  {n:"Pyrax",s:"volcarona"},{n:"Reshiram",s:"reshiram"},{n:"Zekrom",s:"zekrom"},{n:"Kyurem",s:"kyurem"},
+  {n:"Blindépique",s:"chesnaught"},{n:"Goupelin",s:"delphox"},{n:"Amphinobi",s:"greninja"},
+  {n:"Flambusard",s:"talonflame"},{n:"Prismillon",s:"vivillon"},{n:"Némélios",s:"pyroar"},
+  {n:"Florges",s:"florges"},{n:"Chevroum",s:"gogoat"},{n:"Pandarbare",s:"pangoro"},
+  {n:"Mistigrix",s:"meowstic"},{n:"Exagide",s:"aegislash"},{n:"Aromatisse",s:"aromatisse"},
+  {n:"Cupcanaille",s:"slurpuff"},{n:"Sepiatroce",s:"malamar"},{n:"Golgopathe",s:"barbaracle"},
+  {n:"Dragalge",s:"dragalge"},{n:"Gamblast",s:"clawitzer"},{n:"Iguolta",s:"heliolisk"},
+  {n:"Tyrantrum",s:"tyrantrum"},{n:"Dragmara",s:"aurorus"},{n:"Nymphali",s:"sylveon"},
+  {n:"Brutalibré",s:"hawlucha"},{n:"Dedenne",s:"dedenne"},{n:"Muplodocus",s:"goodra"},
+  {n:"Desséliande",s:"trevenant"},{n:"Banshitrouye",s:"gourgeist"},{n:"Bruyverne",s:"noivern"},
+  {n:"Xerneas",s:"xerneas"},{n:"Yveltal",s:"yveltal"},{n:"Zygarde",s:"zygarde"},
+  {n:"Archéduc",s:"decidueye"},{n:"Félinferno",s:"incineroar"},{n:"Oratoria",s:"primarina"},
+  {n:"Bazoucan",s:"toucannon"},{n:"Lucanon",s:"vikavolt"},{n:"Crabominable",s:"crabominable"},
+  {n:"Ribombee",s:"ribombee"},{n:"Lougaroc",s:"lycanroc"},{n:"Prédastérie",s:"toxapex"},
+  {n:"Bourrinos",s:"mudsdale"},{n:"Tarenbulle",s:"araquanid"},{n:"Floramantis",s:"lurantis"},
+  {n:"Lampignon",s:"shiinotic"},{n:"Malamandre",s:"salazzle"},{n:"Chelours",s:"bewear"},
+  {n:"Sucreine",s:"tsareena"},{n:"Guérilande",s:"comfey"},{n:"Sarmuraï",s:"golisopod"},
+  {n:"Trépassable",s:"palossand"},{n:"Silvallié",s:"silvally"},{n:"Togedemaru",s:"togedemaru"},
+  {n:"Mimiqui",s:"mimikyu"},{n:"Ékaïser",s:"kommo-o"},{n:"Solgaleo",s:"solgaleo"},
+  {n:"Lunala",s:"lunala"},{n:"Necrozma",s:"necrozma"},{n:"Magearna",s:"magearna"},
+  {n:"Marshadow",s:"marshadow"},{n:"Zeraora",s:"zeraora"},{n:"Melmetal",s:"melmetal"},
+  {n:"Gorythmic",s:"rillaboom"},{n:"Pyrobut",s:"cinderace"},{n:"Lézargus",s:"inteleon"},
+  {n:"Rongrigou",s:"greedent"},{n:"Corvaillus",s:"corviknight"},{n:"Astronelle",s:"orbeetle"},
+  {n:"Roublenard",s:"thievul"},{n:"Blancoton",s:"eldegoss"},{n:"Moumouflon",s:"dubwool"},
+  {n:"Torgamord",s:"drednaw"},{n:"Volthdog",s:"boltund"},{n:"Monthracite",s:"coalossal"},
+  {n:"Dratatin",s:"appletun"},{n:"Dunaserpent",s:"sandaconda"},{n:"Nigosier",s:"cramorant"},
+  {n:"Barraskewda",s:"barraskewda"},{n:"Scolocendre",s:"centiskorch"},{n:"Grapploct",s:"grapploct"},
+  {n:"Polthégeist",s:"polteageist"},{n:"Sorcilence",s:"hatterene"},{n:"Grimmsnarl",s:"grimmsnarl"},
+  {n:"Ixon",s:"obstagoon"},{n:"Perrserker",s:"perrserker"},{n:"Cursola",s:"cursola"},
+  {n:"Palarticho",s:"sirfetchd"},{n:"Charmilly",s:"alcremie"},{n:"Hexadron",s:"falinks"},
+  {n:"Beldeneige",s:"frosmoth"},{n:"Morpeko",s:"morpeko"},{n:"Duralugon",s:"duraludon"},
+  {n:"Lanssorien",s:"dragapult"},{n:"Zacian",s:"zacian"},{n:"Zamazenta",s:"zamazenta"},
+  {n:"Éthernatos",s:"eternatus"},{n:"Shifours",s:"urshifu"},{n:"Zarude",s:"zarude"},
+  {n:"Miascarade",s:"meowscarada"},{n:"Flâmigator",s:"skeledirge"},{n:"Palmaval",s:"quaquaval"},
+  {n:"Fragroin",s:"oinkologne"},{n:"Filentrappe",s:"spidops"},{n:"Gambex",s:"lokix"},
+  {n:"Pohmarmotte",s:"pawmot"},{n:"Famignol",s:"maushold"},{n:"Briochien",s:"dachsbun"},
+  {n:"Arboliva",s:"arboliva"},{n:"Garganacl",s:"garganacl"},{n:"Armarouge",s:"armarouge"},
+  {n:"Malvalame",s:"ceruledge"},{n:"Bellibolt",s:"bellibolt"},{n:"Fulgulairo",s:"kilowattrel"},
+  {n:"Mabosstiff",s:"mabosstiff"},{n:"Tagtag",s:"grafaiai"},{n:"Virevorreur",s:"brambleghast"},
+  {n:"Terracruel",s:"toedscruel"},{n:"Balbalèze",s:"cetitan"},{n:"Courrousinge",s:"annihilape"},
+  {n:"Farigiraf",s:"farigiraf"},{n:"Deusolourdo",s:"dudunsparce"},{n:"Scalpereur",s:"kingambit"},
+  {n:"Gholdengo",s:"gholdengo"},{n:"Koraidon",s:"koraidon"},{n:"Miraidon",s:"miraidon"},
+  {n:"Ogerpon",s:"ogerpon"},{n:"Terapagos",s:"terapagos"},
+];
 
-let allCaught = [];
+let caughtMap     = {}; // sprite → entry (from Firebase)
 let currentFilter = "all";
 let searchQuery   = "";
 
+// ── FIREBASE POLLING ──
 function startRealtimeSync() {
-  const url = FIREBASE_URL + "/caught.json";
   async function poll() {
     try {
-      const r = await fetch(url);
+      const r    = await fetch(FIREBASE_URL + "/caught.json");
       const data = await r.json();
-      processCaught(data);
-      document.getElementById("last-update").textContent =
-        "màj " + new Date().toLocaleTimeString("fr-FR");
-    } catch(e) {
-      console.error("Firebase poll error:", e);
-    }
+      caughtMap = data || {};
+      const count = Object.keys(caughtMap).length;
+      document.getElementById("total-count").textContent    = count;
+      document.getElementById("total-possible").textContent = Pokedex_Master.length;
+      document.getElementById("last-update").textContent    = "màj " + new Date().toLocaleTimeString("fr-FR");
+      renderGrid();
+    } catch(e) { console.error("Firebase poll:", e); }
   }
   poll();
   setInterval(poll, 10000);
 }
 
-function processCaught(data) {
-  if (!data) { allCaught = []; }
-  else {
-    // On transforme l'objet Firebase en tableau et on ajoute l'ID (clé) à l'objet
-    allCaught = Object.keys(data).map(key => ({
-      ...data[key],
-      id: key 
-    })).sort((a,b) => new Date(b.date) - new Date(a.date));
-  }
-  document.getElementById("total-count").textContent = allCaught.length;
-  document.getElementById("total-possible").textContent = TOTAL_CHAINS;
-  renderGrid();
-}
-
+// ── RENDER ──
 function renderGrid() {
   const grid  = document.getElementById("pokedex-grid");
   const empty = document.getElementById("empty-state");
-  const loading = document.getElementById("loading");
-  if(loading) loading.style.display = "none";
+  document.getElementById("loading").style.display = "none";
 
-  let filtered = allCaught;
+  // --- 1. PRÉPARATION DE LA LISTE ---
+  let list;
 
-  if (currentFilter === "recent") {
-    const cutoff = Date.now() - 7 * 24 * 3600 * 1000;
-    filtered = filtered.filter(p => new Date(p.date).getTime() > cutoff);
-  } else if (["fire", "water", "grass"].includes(currentFilter)) {
-    filtered = filtered.filter(p => CHAIN_TYPES[p.id] === currentFilter);
+  if (currentFilter === "all") {
+    // ON NE TOUCHE À RIEN : C'est ton code d'origine exact
+    list = Pokedex_Master;
+  } else {
+    // UNIQUEMENT POUR L'ONGLET RÉCENTS
+    // On filtre pour n'avoir que les attrapés et on trie par date décroissante
+    list = Pokedex_Master.filter(p => caughtMap[p.s]);
+    
+    list.sort((a, b) => {
+      const dateA = new Date(caughtMap[a.s].date).getTime();
+      const dateB = new Date(caughtMap[b.s].date).getTime();
+      return dateB - dateA; 
+    });
   }
 
+  // Filtre recherche texte (ton code d'origine)
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
-    filtered = filtered.filter(p => p.name.toLowerCase().includes(q));
+    list = list.filter(p => p.n.toLowerCase().includes(q));
   }
 
-  if (!filtered.length) {
-    grid.innerHTML  = "";
+  if (!list.length) {
+    grid.innerHTML = "";
     empty.style.display = "block";
     return;
   }
   empty.style.display = "none";
 
+  // --- 2. AFFICHAGE (Ton système de rendu original) ---
   grid.innerHTML = "";
   const now = Date.now();
+  const frag = document.createDocumentFragment();
 
-  filtered.forEach((poke, i) => {
-    const card  = document.createElement("div");
-    card.className = "poke-card";
-    card.style.animationDelay = (i * 20) + "ms";
+  list.forEach((poke, i) => {
+    const entry    = caughtMap[poke.s];
+    const isCaught = !!entry;
+    // Détection "Nouveau" (48h)
+    const isNew    = isCaught && (now - new Date(entry.date).getTime()) < 48 * 3600 * 1000;
 
-    const caughtDate = new Date(poke.date);
-    const isNew      = (now - caughtDate.getTime()) < 48 * 3600 * 1000;
-    const dateStr    = caughtDate.toLocaleDateString("fr-FR", {day:"2-digit",month:"2-digit"});
+    const card = document.createElement("div");
+    card.className = "poke-card" + (isCaught ? "" : " uncaught");
+    card.style.animationDelay = Math.min(i * 20, 600) + "ms";
 
-    // Gestion du sprite avec fallback automatique
-    const mainImgUrl = SPRITE_ANI + poke.sprite + ".gif";
-    const fallbackUrl = SPRITE_FALLBACK + poke.sprite + ".png";
+    const img = document.createElement("img");
+    if (isCaught) {
+      img.onerror = function() { img.onerror = null; img.src = SPRITE_STATIC + poke.s + ".png"; };
+      img.src = SPRITE_ANI + poke.s + ".gif";
+    } else {
+      img.src = SPRITE_STATIC + poke.s + ".png";
+    }
+    img.alt = isCaught ? poke.n : "???";
+    img.loading = "lazy";
 
-    card.innerHTML = `
-      ${isNew ? '<span class="new-badge">NOUVEAU</span>' : ''}
-      <img src="${mainImgUrl}" 
-           alt="${poke.name}" 
-           onerror="this.onerror=null; this.src='${fallbackUrl}';" 
-           loading="lazy"/>
-      <div class="poke-name">${poke.name}</div>
-      <div class="poke-date">📅 ${dateStr}</div>
-      ${poke.msgs ? `<div class="poke-msgs">💬 ${poke.msgs} msg</div>` : ''}
-    `;
+    const nameEl = document.createElement("div");
+    nameEl.className   = "poke-name";
+    nameEl.textContent = isCaught ? poke.n : "???";
 
-    grid.appendChild(card);
+    card.appendChild(img);
+    card.appendChild(nameEl);
+
+    if (isCaught) {
+      if (isNew) {
+        const badge = document.createElement("span");
+        badge.className   = "new-badge";
+        badge.textContent = "NEW";
+        card.appendChild(badge);
+      }
+      const dateEl = document.createElement("div");
+      dateEl.className   = "poke-date";
+      // Format : Jour/Mois/Année à Heure:Min
+      dateEl.textContent = "📅 " + new Date(entry.date).toLocaleString("fr-FR", {day:"2-digit",month:"2-digit",year:"2-digit", hour:"2-digit", minute:"2-digit"});
+      card.appendChild(dateEl);
+
+      if (entry.msgs) {
+        const msgsEl = document.createElement("div");
+        msgsEl.className   = "poke-msgs";
+        msgsEl.textContent = "💬 " + entry.msgs + " msg";
+        card.appendChild(msgsEl);
+      }
+    }
+    frag.appendChild(card);
   });
+
+  grid.appendChild(frag);
 }
 
+// ── FILTRES ──
 function setFilter(f, btn) {
   currentFilter = f;
   document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
+  document.getElementById("pokedex-grid").dataset.sig = ""; // force re-render
   renderGrid();
 }
-
 function applySearch() {
   searchQuery = document.getElementById("search").value.trim();
+  document.getElementById("pokedex-grid").dataset.sig = "";
   renderGrid();
 }
 
+// ── DÉMARRAGE ──
 startRealtimeSync();
 </script>
 </body>
