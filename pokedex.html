@@ -242,25 +242,23 @@ footer a { color: var(--yellow); text-decoration: none; }
 
 <script>
 const FIREBASE_URL = "https://flpdex-2222b-default-rtdb.europe-west1.firebasedatabase.app";
-const SPRITE_BASE  = "https://img.pokemondb.net/sprites/black-white/anim/normal/";
+// NOUVELLES SOURCES (Identiques au widget)
+const SPRITE_ANI      = "https://play.pokemonshowdown.com/sprites/ani/";
+const SPRITE_FALLBACK = "https://img.pokemondb.net/sprites/home/normal/";
 
-// Type de chaque chaîne (pour les filtres)
 const CHAIN_TYPES = {
   charmander:"fire", torchic:"fire", cyndaquil:"fire", chimchar:"fire", tepig:"fire", fennekin:"fire",
   squirtle:"water",  mudkip:"water",  totodile:"water", piplup:"water",  oshawott:"water", froakie:"water",
   bulbasaur:"grass", treecko:"grass", chikorita:"grass",turtwig:"grass", snivy:"grass",    chespin:"grass",
 };
-const TOTAL_CHAINS = 42; // nombre total de chaînes dans le widget
+const TOTAL_CHAINS = 1000; // Mis à jour pour correspondre à ton nouveau Master Pokedex
 
 let allCaught = [];
 let currentFilter = "all";
 let searchQuery   = "";
 
-// ── FIREBASE REALTIME (SSE) ──
 function startRealtimeSync() {
   const url = FIREBASE_URL + "/caught.json";
-
-  // Polling toutes les 10s (compatible tous navigateurs)
   async function poll() {
     try {
       const r = await fetch(url);
@@ -279,41 +277,35 @@ function startRealtimeSync() {
 function processCaught(data) {
   if (!data) { allCaught = []; }
   else {
-    allCaught = Object.values(data)
-      .sort((a,b) => new Date(b.date) - new Date(a.date));
+    // On transforme l'objet Firebase en tableau et on ajoute l'ID (clé) à l'objet
+    allCaught = Object.keys(data).map(key => ({
+      ...data[key],
+      id: key 
+    })).sort((a,b) => new Date(b.date) - new Date(a.date));
   }
   document.getElementById("total-count").textContent = allCaught.length;
   document.getElementById("total-possible").textContent = TOTAL_CHAINS;
   renderGrid();
 }
 
-// ── RENDER ──
 function renderGrid() {
   const grid  = document.getElementById("pokedex-grid");
   const empty = document.getElementById("empty-state");
-  document.getElementById("loading").style.display = "none";
+  const loading = document.getElementById("loading");
+  if(loading) loading.style.display = "none";
 
   let filtered = allCaught;
 
-  // Filtre type
   if (currentFilter === "recent") {
-    const cutoff = Date.now() - 7 * 24 * 3600 * 1000; // 7 derniers jours
+    const cutoff = Date.now() - 7 * 24 * 3600 * 1000;
     filtered = filtered.filter(p => new Date(p.date).getTime() > cutoff);
-  } else if (currentFilter === "fire")  {
-    filtered = filtered.filter(p => CHAIN_TYPES[p.id] === "fire");
-  } else if (currentFilter === "water") {
-    filtered = filtered.filter(p => CHAIN_TYPES[p.id] === "water");
-  } else if (currentFilter === "grass") {
-    filtered = filtered.filter(p => CHAIN_TYPES[p.id] === "grass");
+  } else if (["fire", "water", "grass"].includes(currentFilter)) {
+    filtered = filtered.filter(p => CHAIN_TYPES[p.id] === currentFilter);
   }
 
-  // Recherche texte
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
-    filtered = filtered.filter(p =>
-      p.name.toLowerCase().includes(q) ||
-      (p.chain||[]).some(c => c.toLowerCase().includes(q))
-    );
+    filtered = filtered.filter(p => p.name.toLowerCase().includes(q));
   }
 
   if (!filtered.length) {
@@ -323,59 +315,49 @@ function renderGrid() {
   }
   empty.style.display = "none";
 
-  // Mise à jour titre
-  const titles = {
-    all:"POKÉMON ATTRAPÉS EN STREAM", recent:"RÉCEMMENT ATTRAPÉS",
-    fire:"POKÉMON FEU", water:"POKÉMON EAU", grass:"POKÉMON PLANTE"
-  };
-  document.getElementById("grid-title").textContent =
-    (titles[currentFilter] || "POKÉMON ATTRAPÉS") +
-    " (" + filtered.length + ")";
-
-  // Génère les cartes seulement si changement
-  const ids = filtered.map(p=>p.id).join(",");
-  if (grid.dataset.rendered === ids) return; // pas de re-render inutile
-  grid.dataset.rendered = ids;
-
   grid.innerHTML = "";
   const now = Date.now();
 
   filtered.forEach((poke, i) => {
     const card  = document.createElement("div");
     card.className = "poke-card";
-    card.style.animationDelay = (i * 40) + "ms";
+    card.style.animationDelay = (i * 20) + "ms";
 
     const caughtDate = new Date(poke.date);
     const isNew      = (now - caughtDate.getTime()) < 48 * 3600 * 1000;
-    const dateStr    = caughtDate.toLocaleDateString("fr-FR", {day:"2-digit",month:"2-digit",year:"2-digit"});
+    const dateStr    = caughtDate.toLocaleDateString("fr-FR", {day:"2-digit",month:"2-digit"});
 
-    const chain = (poke.chain || []).join(" → ");
+    // Gestion du sprite avec fallback automatique
+    const mainImgUrl = SPRITE_ANI + poke.sprite + ".gif";
+    const fallbackUrl = SPRITE_FALLBACK + poke.sprite + ".png";
 
-    card.innerHTML =
-      (isNew ? '<span class="new-badge">NOUVEAU</span>' : "") +
-      '<img src="' + SPRITE_BASE + poke.sprite + '.gif" alt="' + poke.name + '" loading="lazy"/>' +
-      '<div class="poke-name">' + poke.name + '</div>' +
-      '<div class="poke-chain">' + chain + '</div>' +
-      '<div class="poke-date">📅 ' + dateStr + '</div>' +
-      (poke.msgs ? '<div class="poke-msgs">💬 ' + poke.msgs + ' msg</div>' : "");
+    card.innerHTML = `
+      ${isNew ? '<span class="new-badge">NOUVEAU</span>' : ''}
+      <img src="${mainImgUrl}" 
+           alt="${poke.name}" 
+           onerror="this.onerror=null; this.src='${fallbackUrl}';" 
+           loading="lazy"/>
+      <div class="poke-name">${poke.name}</div>
+      <div class="poke-date">📅 ${dateStr}</div>
+      ${poke.msgs ? `<div class="poke-msgs">💬 ${poke.msgs} msg</div>` : ''}
+    `;
 
     grid.appendChild(card);
   });
 }
 
-// ── FILTRES ──
 function setFilter(f, btn) {
   currentFilter = f;
   document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
   renderGrid();
 }
+
 function applySearch() {
   searchQuery = document.getElementById("search").value.trim();
   renderGrid();
 }
 
-// ── DÉMARRAGE ──
 startRealtimeSync();
 </script>
 </body>
