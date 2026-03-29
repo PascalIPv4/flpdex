@@ -237,9 +237,24 @@ footer a { color: var(--yellow); text-decoration: none; }
 </header>
 
 <div class="filters">
-  <button class="filter-btn active" data-filter="all"    onclick="setFilter('all',this)">Tous</button>
-  <button class="filter-btn"        data-filter="recent" onclick="setFilter('recent',this)">Récents</button>
+  <button class="filter-btn active" onclick="setFilter('all', this)">Tous</button>
+  <button class="filter-btn" onclick="setFilter('recent', this)">Récents</button>
+  <button class="filter-btn" onclick="setFilter('caught', this)">Attrapés</button>
+  <button class="filter-btn" onclick="setFilter('missing', this)">Manquants</button>
   <input class="search-input" id="search" type="text" placeholder="Chercher un Pokémon…" oninput="applySearch()" autocomplete="off"/>
+</div>
+
+<div class="filters sub-filters" style="margin-top: 10px; flex-wrap: wrap; gap: 5px; justify-content: center;">
+  <button class="filter-btn active" onclick="setGen('all', this)">Toutes Gen</button>
+  <button class="filter-btn" onclick="setGen(1, this)">G1</button>
+  <button class="filter-btn" onclick="setGen(2, this)">G2</button>
+  <button class="filter-btn" onclick="setGen(3, this)">G3</button>
+  <button class="filter-btn" onclick="setGen(4, this)">G4</button>
+  <button class="filter-btn" onclick="setGen(5, this)">G5</button>
+  <button class="filter-btn" onclick="setGen(6, this)">G6</button>
+  <button class="filter-btn" onclick="setGen(7, this)">G7</button>
+  <button class="filter-btn" onclick="setGen(8, this)">G8</button>
+  <button class="filter-btn" onclick="setGen(9, this)">G9</button>
 </div>
 
 <main>
@@ -295,9 +310,10 @@ const Pokedex_Master = [
 
 let caughtMap     = {}; // sprite → entry (from Firebase)
 let currentFilter = "all";
+let currentGen    = "all"; // Nouvelle variable pour la génération
 let searchQuery   = "";
 
-// ── FIREBASE POLLING ──
+// ── FIREBASE POLLING (Inchangé, garde ta synchro) ──
 function startRealtimeSync() {
   async function poll() {
     try {
@@ -315,57 +331,81 @@ function startRealtimeSync() {
   setInterval(poll, 10000);
 }
 
-// ── RENDER ──
+// ── RENDER (Logique complétée) ──
 function renderGrid() {
   const grid  = document.getElementById("pokedex-grid");
   const empty = document.getElementById("empty-state");
-  document.getElementById("loading").style.display = "none";
+  const loading = document.getElementById("loading");
+  if(loading) loading.style.display = "none";
 
-  // --- 1. PRÉPARATION DE LA LISTE ---
-  let list;
+  const now = Date.now();
+  const SEPT_JOURS_MS = 7 * 24 * 60 * 60 * 1000;
 
-  if (currentFilter === "all") {
-    // ON NE TOUCHE À RIEN : C'est ton code d'origine exact
-    list = Pokedex_Master;
-  } else {
-    // UNIQUEMENT POUR L'ONGLET RÉCENTS
-    // On filtre pour n'avoir que les attrapés et on trie par date décroissante
-    list = Pokedex_Master.filter(p => caughtMap[p.s]);
-    
-    list.sort((a, b) => {
-      const dateA = new Date(caughtMap[a.s].date).getTime();
-      const dateB = new Date(caughtMap[b.s].date).getTime();
-      return dateB - dateA; 
+  // Bornes des générations (Index dans Pokedex_Master)
+  const ranges = {
+    1: [0, 151], 2: [151, 251], 3: [251, 386], 4: [386, 493], 5: [493, 649],
+    6: [649, 721], 7: [721, 809], 8: [809, 905], 9: [905, 1025]
+  };
+
+  // --- 1. FILTRAGE DE LA LISTE ---
+  let list = Pokedex_Master.map((p, index) => ({ ...p, originalIndex: index }));
+
+  // A. Filtre par Statut (Récents, Attrapés, Manquants)
+  if (currentFilter === "recent") {
+    const last20Ids = Object.keys(caughtMap)
+      .sort((a, b) => new Date(caughtMap[b].date).getTime() - new Date(caughtMap[a].date).getTime())
+      .slice(0, 20);
+
+    list = list.filter(p => {
+      const entry = caughtMap[p.s];
+      if (!entry) return false;
+      const isTop20 = last20Ids.includes(p.s.toString());
+      const isThisWeek = (now - new Date(entry.date).getTime()) < SEPT_JOURS_MS;
+      return isTop20 || isThisWeek;
     });
+
+    // Tri par date pour l'onglet récent
+    list.sort((a, b) => new Date(caughtMap[b.s].date).getTime() - new Date(caughtMap[a.s].date).getTime());
+  } 
+  else if (currentFilter === "caught") {
+    list = list.filter(p => caughtMap[p.s]);
+  } 
+  else if (currentFilter === "missing") {
+    list = list.filter(p => !caughtMap[p.s]);
   }
 
-  // Filtre recherche texte (ton code d'origine)
+  // B. Filtre par Génération (uniquement si on n'est pas en "Récents")
+  if (currentFilter !== "recent" && currentGen !== "all") {
+    const [start, end] = ranges[currentGen];
+    list = list.filter(p => p.originalIndex >= start && p.originalIndex < end);
+  }
+
+  // C. Filtre Recherche
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
-    list = list.filter(p => p.n.toLowerCase().includes(q));
+    list = list.filter(p => p.n.toLowerCase().includes(q) || p.s.toString().includes(q));
   }
 
+  // Gestion état vide
   if (!list.length) {
     grid.innerHTML = "";
-    empty.style.display = "block";
+    if(empty) empty.style.display = "block";
     return;
   }
-  empty.style.display = "none";
+  if(empty) empty.style.display = "none";
 
-  // --- 2. AFFICHAGE (Ton système de rendu original) ---
+  // --- 2. AFFICHAGE ---
   grid.innerHTML = "";
-  const now = Date.now();
   const frag = document.createDocumentFragment();
 
   list.forEach((poke, i) => {
     const entry    = caughtMap[poke.s];
     const isCaught = !!entry;
-    // Détection "Nouveau" (48h)
     const isNew    = isCaught && (now - new Date(entry.date).getTime()) < 48 * 3600 * 1000;
 
     const card = document.createElement("div");
     card.className = "poke-card" + (isCaught ? "" : " uncaught");
-    card.style.animationDelay = Math.min(i * 20, 600) + "ms";
+    card.style.animationDelay = Math.min(i * 10, 400) + "ms";
 
     const img = document.createElement("img");
     if (isCaught) {
@@ -375,7 +415,6 @@ function renderGrid() {
       img.src = SPRITE_STATIC + poke.s + ".png";
     }
     img.alt = isCaught ? poke.n : "???";
-    img.loading = "lazy";
 
     const nameEl = document.createElement("div");
     nameEl.className   = "poke-name";
@@ -387,40 +426,44 @@ function renderGrid() {
     if (isCaught) {
       if (isNew) {
         const badge = document.createElement("span");
-        badge.className   = "new-badge";
+        badge.className = "new-badge";
         badge.textContent = "NEW";
         card.appendChild(badge);
       }
       const dateEl = document.createElement("div");
-      dateEl.className   = "poke-date";
-      // Format : Jour/Mois/Année à Heure:Min
+      dateEl.className = "poke-date";
       dateEl.textContent = "📅 " + new Date(entry.date).toLocaleString("fr-FR", {day:"2-digit",month:"2-digit",year:"2-digit", hour:"2-digit", minute:"2-digit"});
       card.appendChild(dateEl);
 
       if (entry.msgs) {
         const msgsEl = document.createElement("div");
-        msgsEl.className   = "poke-msgs";
+        msgsEl.className = "poke-msgs";
         msgsEl.textContent = "💬 " + entry.msgs + " msg";
         card.appendChild(msgsEl);
       }
     }
     frag.appendChild(card);
   });
-
   grid.appendChild(frag);
 }
 
-// ── FILTRES ──
+// ── FONCTIONS DE FILTRES (Appelées par tes boutons) ──
 function setFilter(f, btn) {
   currentFilter = f;
-  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.parentElement.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
-  document.getElementById("pokedex-grid").dataset.sig = ""; // force re-render
   renderGrid();
 }
+
+function setGen(g, btn) {
+  currentGen = g;
+  btn.parentElement.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderGrid();
+}
+
 function applySearch() {
   searchQuery = document.getElementById("search").value.trim();
-  document.getElementById("pokedex-grid").dataset.sig = "";
   renderGrid();
 }
 
