@@ -210,6 +210,82 @@ footer a { color: var(--yellow); text-decoration: none; }
   main, .filters { padding: 16px; }
   #pokedex-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
 }
+/* Style de la fenêtre surgissante */
+.modal {
+  display: none; 
+  position: fixed;
+  z-index: 9999;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0,0,0,0.85);
+  backdrop-filter: blur(8px); /* Effet de flou derrière */
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+  border: 2px solid #444;
+  border-radius: 25px;
+  padding: 40px;
+  width: 90%;
+  max-width: 450px;
+  position: relative;
+  text-align: center;
+  color: white;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+}
+
+.close-btn {
+  position: absolute;
+  top: 15px; right: 20px;
+  font-size: 35px;
+  cursor: pointer;
+  color: #666;
+  transition: 0.3s;
+}
+.close-btn:hover { color: #fff; }
+
+.modal-img {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  margin-bottom: 20px;
+  filter: drop-shadow(0 0 10px rgba(255,255,255,0.2));
+}
+
+.modal-title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 5px;
+}
+
+.modal-id {
+  color: #888;
+  font-family: monospace;
+  font-size: 1.1rem;
+  margin-bottom: 25px;
+}
+
+.modal-stats {
+  background: rgba(255,255,255,0.05);
+  border-radius: 15px;
+  padding: 20px;
+  text-align: left;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.stat-line {
+  margin: 10px 0;
+  font-size: 1.1rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.stat-label { color: #aaa; font-size: 0.9rem; text-transform: uppercase; }
+.stat-value { color: #fff; font-weight: bold; }
 </style>
 </head>
 <body>
@@ -236,6 +312,16 @@ footer a { color: var(--yellow); text-decoration: none; }
   </div>
 </header>
 
+  <!-- Fenêtre Modale Pokédex -->
+<div id="poke-modal" class="modal" onclick="closeModal()">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <span class="close-btn" onclick="closeModal()">&times;</span>
+    <div id="modal-body">
+      <!-- Le contenu sera injecté par le JavaScript -->
+    </div>
+  </div>
+</div>
+  
 <div class="filters">
   <button class="filter-btn active" onclick="setFilter('all', this)">Tous</button>
   <button class="filter-btn" onclick="setFilter('recent', this)">Récents</button>
@@ -406,6 +492,7 @@ function renderGrid() {
     const card = document.createElement("div");
     card.className = "poke-card" + (isCaught ? "" : " uncaught");
     card.style.animationDelay = Math.min(i * 10, 400) + "ms";
+    card.onclick = () => openPokeDetails(poke, entry);
 
     const img = document.createElement("img");
     if (isCaught) {
@@ -465,6 +552,55 @@ function setGen(g, btn) {
 function applySearch() {
   searchQuery = document.getElementById("search").value.trim();
   renderGrid();
+}
+function openPokeDetails(poke, entry) {
+  const modal = document.getElementById("poke-modal");
+  const body = document.getElementById("modal-body");
+  const isCaught = !!entry;
+
+  body.innerHTML = `
+    <img class="modal-img" src="${isCaught ? (SPRITE_ANI + poke.s + '.gif') : (SPRITE_STATIC + poke.s + '.png')}" 
+         onerror="this.src='${SPRITE_STATIC + poke.s + '.png'}'">
+    
+    <div class="modal-title">${isCaught ? poke.n : "???"}</div>
+    <div class="modal-id">N° NATIONAL ${poke.s.toString().padStart(4, '0')}</div>
+    
+    <div class="modal-stats">
+      <div class="stat-line">
+        <span class="stat-label">Statut</span>
+        <span class="stat-value" style="color: ${isCaught ? '#44ff44' : '#ff4444'}">
+          ${isCaught ? 'ATTRAPÉ' : 'MANQUANT'}
+        </span>
+      </div>
+      
+      ${isCaught ? `
+        <div class="stat-line">
+          <span class="stat-label">Date de capture</span>
+          <span class="stat-value">${new Date(entry.date).toLocaleDateString("fr-FR")}</span>
+        </div>
+        <div class="stat-line">
+          <span class="stat-label">Heure exacte</span>
+          <span class="stat-value">${new Date(entry.date).toLocaleTimeString("fr-FR", {hour: '2-digit', minute:'2-digit'})}</span>
+        </div>
+        ${entry.msgs ? `
+          <div class="stat-line" style="margin-top:15px; border-top: 1px solid #444; padding-top: 10px;">
+            <span class="stat-label">Messages Twitch</span>
+            <span class="stat-value">💬 ${entry.msgs}</span>
+          </div>
+        ` : ''}
+      ` : `
+        <p style="text-align:center; color:#666; font-style:italic; margin-top:10px;">
+          Continue tes recherches, dresseur !
+        </p>
+      `}
+    </div>
+  `;
+
+  modal.style.display = "flex";
+}
+
+function closeModal() {
+  document.getElementById("poke-modal").style.display = "none";
 }
 
 // ── DÉMARRAGE ──
